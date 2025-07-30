@@ -1,0 +1,14 @@
+Flask
+Werkzeug
+google-generativeai
+pandas
+Pillow
+python-dotenv
+tensorflow
+scikit-learn
+matplotlib
+seaborn
+pytesseract
+opencv-python
+numpy
+gunicorn
