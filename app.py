@@ -17,7 +17,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', '6413749eb506f8d52efaa8523dfa6594
 
 # Configuration
 UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}  # Removed 'bmp' as it's not supported by Gemini
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max file size
 
@@ -63,9 +63,23 @@ def extract_medicine_name_from_image(image_path):
     if not vision_model:
         return "Error: Gemini vision model not initialized."
     try:
+        # Open and convert image to RGB format (removes alpha channel and ensures compatibility)
         image = Image.open(image_path)
+        
+        # Convert to RGB if it's not already (handles RGBA, CMYK, etc.)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Convert to JPEG format in memory to ensure compatibility with Gemini
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='JPEG', quality=95)
+        img_byte_arr.seek(0)
+        
+        # Create a new PIL Image from the converted bytes
+        converted_image = Image.open(img_byte_arr)
+        
         prompt = "Extract only the medicine name from this image. Return just the name, nothing else."
-        response = vision_model.generate_content([prompt, image])
+        response = vision_model.generate_content([prompt, converted_image])
         return response.text.strip()
     except Exception as e:
         return f"Error extracting medicine name: {e}"
@@ -173,7 +187,7 @@ def upload_file():
         except Exception as e:
             return jsonify({'error': f'Error processing file: {str(e)}'}), 500
     
-    return jsonify({'error': 'Invalid file type. Please upload JPG, PNG, GIF, or BMP files.'}), 400
+    return jsonify({'error': 'Invalid file type. Please upload JPG, PNG, or GIF files.'}), 400
 
 @app.route('/search', methods=['POST'])
 def search_medicine():
