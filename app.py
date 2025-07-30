@@ -63,6 +63,9 @@ def extract_medicine_name_from_image(image_path):
     if not vision_model:
         return "Error: Gemini vision model not initialized."
     try:
+        import time
+        start_time = time.time()
+        
         # Open and convert image to RGB format (removes alpha channel and ensures compatibility)
         image = Image.open(image_path)
         
@@ -80,9 +83,22 @@ def extract_medicine_name_from_image(image_path):
         
         prompt = "Extract only the medicine name from this image. Return just the name, nothing else."
         response = vision_model.generate_content([prompt, converted_image])
+        
+        # Check if response took too long
+        if time.time() - start_time > 30:  # 30 seconds timeout
+            return "Error: Request timed out. Please try again."
+            
         return response.text.strip()
     except Exception as e:
-        return f"Error extracting medicine name: {e}"
+        error_msg = str(e)
+        if "timeout" in error_msg.lower() or "network" in error_msg.lower():
+            return "Network error. Please check your internet connection and try again."
+        elif "quota" in error_msg.lower() or "rate" in error_msg.lower():
+            return "API quota exceeded. Please try again later."
+        elif "unsupported mime type" in error_msg.lower():
+            return "Error: Unsupported image format. Please upload JPG, PNG, or GIF files."
+        else:
+            return f"Error extracting medicine name: {error_msg}"
 
 def get_medicine_info_from_dataset(medicine_name):
     if medicine_df is None:
@@ -105,6 +121,9 @@ def get_gemini_description(medicine_name):
     if not text_model:
         return "Error: Gemini text model not initialized."
     try:
+        import time
+        start_time = time.time()
+        
         prompt = f"""
 Give detailed multilingual information for '{medicine_name}' in this format:
 
@@ -115,7 +134,7 @@ Give detailed multilingual information for '{medicine_name}' in this format:
 
 **Hindi:**
 - उपयोग: [Medical uses in Hindi]
-- दुष्प्रभाव: [Side effects in Hindi]
+- दुष्परिणाम: [Side effects in Hindi]
 - सावधानियां: [Precautions in Hindi]
 
 **Marathi:**
@@ -125,10 +144,22 @@ Give detailed multilingual information for '{medicine_name}' in this format:
 
 Keep it medical, accurate, and concise.
 """
+        # Add timeout handling
         response = text_model.generate_content(prompt)
+        
+        # Check if response took too long
+        if time.time() - start_time > 30:  # 30 seconds timeout
+            return "Error: Request timed out. Please try again."
+            
         return response.text
     except Exception as e:
-        return f"Error getting medicine description: {e}"
+        error_msg = str(e)
+        if "timeout" in error_msg.lower() or "network" in error_msg.lower():
+            return "Network error. Please check your internet connection and try again."
+        elif "quota" in error_msg.lower() or "rate" in error_msg.lower():
+            return "API quota exceeded. Please try again later."
+        else:
+            return f"Error getting medicine description: {error_msg}"
 
 @app.route('/')
 def index():
@@ -244,4 +275,4 @@ if __name__ == '__main__':
     print(f"📊 Medicine database: {'✅ Loaded' if medicine_df is not None else '❌ Not available'}")
     print(f"🤖 Gemini AI: {'✅ Initialized' if vision_model and text_model else '❌ Not available'}")
     print("🌐 Server starting at http://localhost:5000")
-    app.run() 
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False) 
